@@ -1,4 +1,4 @@
-# Renewly
+# Renewly (App in Development)
 
 Renewly is an Android app that helps you manage all your subscriptions in one place. Keep track of renewal dates, prices, and notes for your recurring services and never miss a payment again.
 
