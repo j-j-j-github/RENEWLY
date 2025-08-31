@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "868441139088",
+    "project_id": "renewly-app",
+    "storage_bucket": "renewly-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:868441139088:android:a34b22fcbf5598cc967515",
+        "android_client_info": {
+          "package_name": "com.example.renewly"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCtl5O-eFePzi3yWcaINRbWEcP81AyD0jM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
