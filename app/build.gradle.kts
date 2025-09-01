@@ -51,7 +51,7 @@ android {
     }
 }
 
-dependencies { // 👈 make sure ALL dependencies are inside this block
+dependencies {
     // Compose
     implementation(platform("androidx.compose:compose-bom:2024.06.00"))
     implementation("androidx.compose.ui:ui")
@@ -64,15 +64,13 @@ dependencies { // 👈 make sure ALL dependencies are inside this block
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.3")
     implementation("androidx.navigation:navigation-compose:2.7.7")
 
-    // Supabase
-    val supabaseVersion = "2.5.2"
+    // --- SUPABASE - Downgraded for Kotlin 1.9 Compatibility ---
+    val supabaseVersion = "2.5.4" // <-- THE ONLY CHANGE NEEDED
     implementation(platform("io.github.jan-tennert.supabase:bom:$supabaseVersion"))
     implementation("io.github.jan-tennert.supabase:gotrue-kt")
     implementation("io.github.jan-tennert.supabase:postgrest-kt")
     implementation("io.github.jan-tennert.supabase:storage-kt")
-
-    // Ktor
-    implementation("io.ktor:ktor-client-android:2.3.0")
+    // ---------------------------------------------------------
 
     // Firebase
     implementation(platform("com.google.firebase:firebase-bom:33.1.1"))
@@ -84,6 +82,5 @@ dependencies { // 👈 make sure ALL dependencies are inside this block
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 }
-
 
 
