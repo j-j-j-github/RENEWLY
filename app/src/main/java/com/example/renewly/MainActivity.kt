@@ -41,7 +41,11 @@ class MainActivity : ComponentActivity() {
                 val authed = auth.currentUser != null
                 NavHost(navController = nav, startDestination = if (authed) "list" else "auth") {
                     composable("auth") {
-                        AuthScreen(onAuthed = { nav.navigate("list") { popUpTo("auth") { inclusive = true } } })
+                        AuthScreen(onAuthed = {
+                            nav.navigate("list") {
+                                popUpTo("auth") { inclusive = true }
+                            }
+                        })
                     }
 
                     composable("list") {
@@ -52,13 +56,35 @@ class MainActivity : ComponentActivity() {
                             onToggleDark = { scope.launch { themeRepo.setDark(!dark) } },
                             onAdd = { nav.navigate("edit") },
                             onEdit = { sub -> nav.navigate("edit?id=${sub.id}") },
-                            onDelete = { sub -> vm.delete(sub.id) }
+                            onDelete = { sub -> vm.delete(sub.id) },
+                            onLogout = {
+                                auth.signOut()
+                                nav.navigate("auth") {
+                                    popUpTo("list") { inclusive = true }
+                                }
+                            }
+                        )
+                    }
+
+                    composable("edit") {
+                        val vm: SubscriptionsViewModel = viewModel()
+                        AddEditSubscriptionScreen(
+                            original = null,
+                            onSave = { sub ->
+                                vm.add(sub)
+                                nav.popBackStack()
+                            },
+                            onCancel = { nav.popBackStack() },
+                            onDelete = {}
                         )
                     }
 
                     composable(
                         route = "edit?id={id}",
-                        arguments = listOf(navArgument("id") { type = NavType.StringType; defaultValue = "" })
+                        arguments = listOf(navArgument("id") {
+                            type = NavType.StringType
+                            defaultValue = ""
+                        })
                     ) { backStackEntry ->
                         val id = backStackEntry.arguments?.getString("id").orEmpty()
                         val vm: SubscriptionsViewModel = viewModel()
@@ -70,8 +96,8 @@ class MainActivity : ComponentActivity() {
                                 if (existing == null) vm.add(sub) else vm.update(existing.id, sub)
                                 nav.popBackStack()
                             },
-                            onCancel = { nav.popBackStack() }, // This parameter was missing in the previous error log
-                            onDelete = { sub -> // ADD THIS LINE
+                            onCancel = { nav.popBackStack() },
+                            onDelete = { sub ->
                                 vm.delete(sub.id)
                                 nav.popBackStack()
                             }

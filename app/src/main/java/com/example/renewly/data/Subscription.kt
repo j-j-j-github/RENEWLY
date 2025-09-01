@@ -7,5 +7,6 @@ data class Subscription(
     val cycleInDays: Int = 30,
     val nextDueDate: Long = System.currentTimeMillis(),
     val notes: String? = null,
-    val iconKey: String = "🧩"
+    val iconKey: String = "🧩",
+    val iconUri: String? = null
 )

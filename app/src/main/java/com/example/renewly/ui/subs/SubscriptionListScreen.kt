@@ -11,7 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Brightness6
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,11 +21,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.example.renewly.data.Subscription
 import kotlinx.coroutines.delay
 import java.util.concurrent.TimeUnit
 
-@OptIn(ExperimentalMaterial3Api::class) // ADD THIS LINE
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SubscriptionListScreen(
     subs: List<Subscription>,
@@ -34,33 +35,75 @@ fun SubscriptionListScreen(
     onAdd: () -> Unit,
     onEdit: (Subscription) -> Unit,
     onDelete: (Subscription) -> Unit,
+    onLogout: () -> Unit = {}
 ) {
-    Scaffold(
-        topBar = {
-            SmallTopAppBar(
-                title = { Text("Renewly") },
-                actions = {
-                    IconButton(onClick = onToggleDark) { Icon(Icons.Default.Brightness6, contentDescription = null) }
-                }
-            )
-        },
-        floatingActionButton = {
-            FloatingActionButton(onClick = onAdd) { Icon(Icons.Default.Add, contentDescription = null) }
-        }
-    ) { padding ->
-        LazyColumn(
-            contentPadding = padding,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            items(subs) { sub ->
-                SubscriptionCard(
-                    sub = sub,
-                    onClick = { onEdit(sub) },
-                    onDelete = { onDelete(sub) }
+    var showMenu by remember { mutableStateOf(false) }
+
+    Box(Modifier.fillMaxSize()) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("RENEWLY") },
+                    actions = {
+                        IconButton(onClick = onToggleDark) {
+                            Icon(Icons.Default.Brightness6, contentDescription = "Toggle Theme")
+                        }
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "Menu")
+                        }
+                    }
                 )
+            },
+            floatingActionButton = {
+                FloatingActionButton(onClick = onAdd) {
+                    Icon(Icons.Default.Add, contentDescription = null)
+                }
+            }
+        ) { padding ->
+            LazyColumn(
+                contentPadding = padding,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(subs) { sub ->
+                    SubscriptionCard(
+                        sub = sub,
+                        onClick = { onEdit(sub) },
+                        onDelete = { onDelete(sub) }
+                    )
+                }
+            }
+        }
+
+        if (showMenu) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .clickable { showMenu = false }
+            )
+
+            Surface(
+                tonalElevation = 8.dp,
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .width(220.dp)
+                    .align(Alignment.CenterEnd)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.Top
+                ) {
+                    Text("Menu", style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(8.dp))
+                    Button(onClick = { onLogout(); showMenu = false }) {
+                        Text("Logout")
+                    }
+                }
             }
         }
     }
@@ -78,27 +121,51 @@ private fun SubscriptionCard(sub: Subscription, onClick: () -> Unit, onDelete: (
             containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
         )
     ) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier
-                    .size(46.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.linearGradient(listOf(
-                            MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
-                            MaterialTheme.colorScheme.secondary.copy(alpha = 0.25f)
-                        ))
-                    ), contentAlignment = Alignment.Center
-            ) {
-                Text(sub.iconKey.take(2), style = MaterialTheme.typography.titleMedium)
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(sub.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("₹" + String.format("%.2f", sub.price))
-                CountdownText(targetMillis = sub.nextDueDate)
+        Row(
+            Modifier
+                .padding(16.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val isFirebaseUrl = sub.iconUri?.startsWith("https://") == true
+                if (isFirebaseUrl) {
+                    AsyncImage(
+                        model = sub.iconUri,
+                        contentDescription = sub.name,
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(CircleShape)
+                    )
+                } else {
+                    // Fallback: show emoji/text if no valid Firebase URL
+                    Box(
+                        Modifier
+                            .size(46.dp)
+                            .clip(CircleShape)
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.25f)
+                                    )
+                                )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(sub.iconKey.take(2), style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(sub.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text("₹" + String.format("%.2f", sub.price))
+                }
             }
 
+            CountdownText(targetMillis = sub.nextDueDate)
         }
     }
 }
@@ -115,13 +182,12 @@ private fun CountdownText(targetMillis: Long) {
     val diff = (targetMillis - now).coerceAtLeast(0)
     val d = TimeUnit.MILLISECONDS.toDays(diff)
     val h = TimeUnit.MILLISECONDS.toHours(diff - TimeUnit.DAYS.toMillis(d))
-    val m = TimeUnit.MILLISECONDS.toMinutes(diff - TimeUnit.DAYS.toMillis(d) - TimeUnit.HOURS.toMillis(h))
-    val s = TimeUnit.MILLISECONDS.toSeconds(diff - TimeUnit.DAYS.toMillis(d) - TimeUnit.HOURS.toMillis(h) - TimeUnit.MINUTES.toMillis(m))
     val overdue = targetMillis < now
 
     Text(
-        if (!overdue) "$d d $h h $m m $s s left" else "Due!",
-        color = if (overdue) Color.Red else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
-        style = MaterialTheme.typography.titleMedium // This makes the text bigger
+        if (!overdue) "$d Days, $h Hours" else "Due!",
+        color = if (overdue) Color.Red else MaterialTheme.colorScheme.onSurface,
+        style = MaterialTheme.typography.titleLarge,
+        fontWeight = FontWeight.Bold
     )
 }

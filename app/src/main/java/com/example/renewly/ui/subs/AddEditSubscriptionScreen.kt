@@ -1,15 +1,57 @@
 package com.example.renewly.ui.subs
-import androidx.compose.foundation.text.KeyboardOptions
+
+import android.app.DatePickerDialog
+import android.content.Context
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.dp
-import com.example.renewly.data.Subscription
-import java.util.Calendar
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import com.example.renewly.data.Subscription
+import com.example.renewly.data.SupabaseClientProvider
+import io.github.jan.supabase.storage.storage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import java.util.Calendar
+import java.util.UUID
+
+enum class CycleType { MONTHLY, YEARLY }
+
+fun uploadIconToSupabase(context: Context, uri: Uri, onComplete: (String?) -> Unit) {
+    CoroutineScope(Dispatchers.IO).launch {
+        try {
+            val inputStream = context.contentResolver.openInputStream(uri)!!
+            val bytes = inputStream.readBytes()
+            inputStream.close()
+
+            val fileName = "${UUID.randomUUID()}.png"
+            val bucket = SupabaseClientProvider.client.storage.from("subscription-icons")
+
+            // Upload file
+            bucket.upload(fileName, bytes, upsert = true)
+
+            // Get public URL
+            val url = bucket.publicUrl(fileName)
+
+            onComplete(url)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            onComplete(null)
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -17,17 +59,53 @@ fun AddEditSubscriptionScreen(
     original: Subscription? = null,
     onSave: (Subscription) -> Unit,
     onCancel: () -> Unit,
-    onDelete: (Subscription) -> Unit // ADDED: Parameter for delete action
+    onDelete: (Subscription) -> Unit
 ) {
-    var name by remember { mutableStateOf(original?.name ?: "") }
-    var price by remember { mutableStateOf(if (original != null) original.price.toString() else "") }
-    var cycleDays by remember { mutableStateOf((original?.cycleInDays ?: 30).toString()) }
-    var nextDue by remember { mutableStateOf(original?.nextDueDate ?: Calendar.getInstance().timeInMillis + 24 * 60 * 60 * 1000) }
-    var icon by remember { mutableStateOf(original?.iconKey ?: "🎯") }
+    val context = LocalContext.current
+
+    var name by rememberSaveable { mutableStateOf("") }
+    var price by rememberSaveable { mutableStateOf("") }
+    var purchaseDate by rememberSaveable { mutableStateOf(Calendar.getInstance().timeInMillis) }
+    var cycleType by rememberSaveable { mutableStateOf(CycleType.MONTHLY) }
+    var iconKey by rememberSaveable { mutableStateOf("🎯") }
+    var iconUri by rememberSaveable { mutableStateOf<Uri?>(null) }
+    var uploading by remember { mutableStateOf(false) }
+
+    // Load original values when editing
+    LaunchedEffect(original) {
+        if (original != null) {
+            name = original.name
+            price = original.price.toString()
+            purchaseDate = original.nextDueDate
+            cycleType = if (original.cycleInDays >= 365) CycleType.YEARLY else CycleType.MONTHLY
+            iconKey = original.iconKey
+            iconUri = original.iconUri?.let { Uri.parse(it) }
+        }
+    }
+
+    // File picker
+    val imagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        iconUri = uri
+    }
+
+    // Date picker
+    val calendar = Calendar.getInstance().apply { timeInMillis = purchaseDate }
+    val datePicker = DatePickerDialog(
+        context,
+        { _, year, month, day ->
+            calendar.set(year, month, day, 0, 0, 0)
+            purchaseDate = calendar.timeInMillis
+        },
+        calendar.get(Calendar.YEAR),
+        calendar.get(Calendar.MONTH),
+        calendar.get(Calendar.DAY_OF_MONTH)
+    )
 
     Scaffold(
         topBar = {
-            SmallTopAppBar(
+            TopAppBar(
                 title = { Text(if (original == null) "Add Subscription" else "Edit Subscription") },
                 actions = {
                     if (original != null) {
@@ -47,56 +125,104 @@ fun AddEditSubscriptionScreen(
         ) {
             OutlinedTextField(
                 value = name,
-                onValueChange = { name = it },
+                onValueChange = { input -> name = input },
                 label = { Text("Name") },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-
+                modifier = Modifier.fillMaxWidth()
             )
+
             OutlinedTextField(
                 value = price,
-                onValueChange = { price = it.filter { c -> c.isDigit() || c == '.' } },
+                onValueChange = { input -> price = input.filter { ch -> ch.isDigit() || ch == '.' } },
                 label = { Text("Price") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
             )
+
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                FilterChip(
+                    selected = cycleType == CycleType.MONTHLY,
+                    onClick = { cycleType = CycleType.MONTHLY },
+                    label = { Text("Monthly") }
+                )
+                FilterChip(
+                    selected = cycleType == CycleType.YEARLY,
+                    onClick = { cycleType = CycleType.YEARLY },
+                    label = { Text("Yearly") }
+                )
+            }
+
+            Button(onClick = { datePicker.show() }) {
+                val selectedDate = Calendar.getInstance().apply { timeInMillis = purchaseDate }
+                Text("Start Date: ${selectedDate.get(Calendar.DAY_OF_MONTH)}/${selectedDate.get(Calendar.MONTH) + 1}/${selectedDate.get(Calendar.YEAR)}")
+            }
+
             OutlinedTextField(
-                value = cycleDays,
-                onValueChange = { cycleDays = it.filter { c -> c.isDigit() } },
-                label = { Text("Cycle (days)") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth()
-            )
-            OutlinedTextField(
-                value = icon,
-                onValueChange = { icon = it.take(2) },
+                value = iconKey,
+                onValueChange = { input -> iconKey = input.take(2) },
                 label = { Text("Icon (emoji or 1-2 chars)") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
 
-            OutlinedTextField(
-                value = nextDue.toString(),
-                onValueChange = { new -> new.toLongOrNull()?.let { nextDue = it } },
-                label = { Text("Next Due (epoch millis)") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(onClick = { imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
+                    Text("Pick Icon Image")
+                }
+                if (iconUri != null) {
+                    AsyncImage(model = iconUri, contentDescription = "Selected Icon", modifier = Modifier.size(40.dp))
+                }
+            }
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(onClick = {
-                    val sub = Subscription(
-                        id = original?.id ?: "",
-                        name = name.trim(),
-                        price = price.toDoubleOrNull() ?: 0.0,
-                        cycleInDays = cycleDays.toIntOrNull() ?: 30,
-                        nextDueDate = nextDue,
-                        iconKey = icon.ifBlank { "📦" }
-                    )
-                    onSave(sub)
-                }) { Text("Save") }
+                Button(
+                    enabled = !uploading,
+                    onClick = {
+                        uploading = true
+
+                        val calcCalendar = Calendar.getInstance().apply { timeInMillis = purchaseDate }
+                        if (cycleType == CycleType.MONTHLY) {
+                            calcCalendar.add(Calendar.MONTH, 1)
+                        } else {
+                            calcCalendar.add(Calendar.YEAR, 1)
+                        }
+
+                        if (iconUri != null && iconUri.toString().startsWith("content://")) {
+                            uploadIconToSupabase(context, iconUri!!) { uploadedUrl: String? ->
+                                val sub = Subscription(
+                                    id = original?.id ?: "",
+                                    name = name.trim(),
+                                    price = price.toDoubleOrNull() ?: 0.0,
+                                    cycleInDays = if (cycleType == CycleType.YEARLY) 365 else 30,
+                                    nextDueDate = calcCalendar.timeInMillis,
+                                    iconKey = if (uploadedUrl == null) iconKey.ifBlank { "📦" } else "",
+                                    iconUri = uploadedUrl
+                                )
+                                uploading = false
+                                onSave(sub)
+                            }
+                        } else {
+                            val sub = Subscription(
+                                id = original?.id ?: "",
+                                name = name.trim(),
+                                price = price.toDoubleOrNull() ?: 0.0,
+                                cycleInDays = if (cycleType == CycleType.YEARLY) 365 else 30,
+                                nextDueDate = calcCalendar.timeInMillis,
+                                iconKey = original?.iconKey ?: iconKey.ifBlank { "📦" },
+                                iconUri = original?.iconUri
+                            )
+                            uploading = false
+                            onSave(sub)
+                        }
+                    }
+                ) {
+                    Text(if (uploading) "Uploading..." else "Save")
+                }
+
                 OutlinedButton(onClick = onCancel) { Text("Cancel") }
             }
         }
