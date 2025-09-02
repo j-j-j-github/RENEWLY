@@ -64,13 +64,17 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.3")
     implementation("androidx.navigation:navigation-compose:2.7.7")
 
-    // --- SUPABASE - Downgraded for Kotlin 1.9 Compatibility ---
-    val supabaseVersion = "2.5.4" // <-- THE ONLY CHANGE NEEDED
+    // Supabase (Version 2.5.4 is compatible with Kotlin 1.9.23)
+    val supabaseVersion = "2.5.4"
     implementation(platform("io.github.jan-tennert.supabase:bom:$supabaseVersion"))
     implementation("io.github.jan-tennert.supabase:gotrue-kt")
     implementation("io.github.jan-tennert.supabase:postgrest-kt")
     implementation("io.github.jan-tennert.supabase:storage-kt")
-    // ---------------------------------------------------------
+    implementation("io.github.jan-tennert.supabase:realtime-kt") // For real-time updates
+
+    // Ktor dependency is now managed by the Supabase BOM, so we remove it from here
+    implementation("io.ktor:ktor-client-android:2.3.11")
+
 
     // Firebase
     implementation(platform("com.google.firebase:firebase-bom:33.1.1"))

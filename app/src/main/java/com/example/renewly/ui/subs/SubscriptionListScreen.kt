@@ -1,5 +1,5 @@
 package com.example.renewly.ui.subs
-
+import com.example.renewly.data.CycleType
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.renewly.data.Subscription
 import kotlinx.coroutines.delay
+import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -129,8 +130,8 @@ private fun SubscriptionCard(sub: Subscription, onClick: () -> Unit, onDelete: (
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                val isFirebaseUrl = sub.iconUri?.startsWith("https://") == true
-                if (isFirebaseUrl) {
+                val isUrl = sub.iconUri?.startsWith("https://") == true
+                if (isUrl) {
                     AsyncImage(
                         model = sub.iconUri,
                         contentDescription = sub.name,
@@ -139,7 +140,6 @@ private fun SubscriptionCard(sub: Subscription, onClick: () -> Unit, onDelete: (
                             .clip(CircleShape)
                     )
                 } else {
-                    // Fallback: show emoji/text if no valid Firebase URL
                     Box(
                         Modifier
                             .size(46.dp)
@@ -165,28 +165,47 @@ private fun SubscriptionCard(sub: Subscription, onClick: () -> Unit, onDelete: (
                 }
             }
 
-            CountdownText(targetMillis = sub.nextDueDate)
+            CountdownText(
+                startMillis = sub.nextDueDate,
+                cycleType = if (sub.cycleInDays >= 365) CycleType.YEARLY else CycleType.MONTHLY
+            )
         }
     }
 }
 
 @Composable
-private fun CountdownText(targetMillis: Long) {
-    var now by remember { mutableStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(targetMillis) {
+private fun CountdownText(startMillis: Long, cycleType: CycleType) {
+    // Tick every second so the countdown updates
+    val now by produceState(System.currentTimeMillis()) {
         while (true) {
-            now = System.currentTimeMillis()
+            value = System.currentTimeMillis()
             delay(1000)
         }
     }
-    val diff = (targetMillis - now).coerceAtLeast(0)
+
+    // Calculate the *next* due date by rolling the start date forward in calendar units
+    val nextDue = remember(startMillis, cycleType, now) {
+        val cal = Calendar.getInstance().apply { timeInMillis = startMillis }
+        val current = Calendar.getInstance().apply { timeInMillis = now }
+
+        // Keep adding months/years until due date is after "now"
+        while (!cal.after(current)) {
+            when (cycleType) {
+                CycleType.MONTHLY -> cal.add(Calendar.MONTH, 1)
+                CycleType.YEARLY -> cal.add(Calendar.YEAR, 1)
+            }
+        }
+        cal.timeInMillis
+    }
+
+    val diff = (nextDue - now).coerceAtLeast(0)
     val d = TimeUnit.MILLISECONDS.toDays(diff)
     val h = TimeUnit.MILLISECONDS.toHours(diff - TimeUnit.DAYS.toMillis(d))
-    val overdue = targetMillis < now
+    val dueNow = diff == 0L
 
     Text(
-        if (!overdue) "$d Days, $h Hours" else "Due!",
-        color = if (overdue) Color.Red else MaterialTheme.colorScheme.onSurface,
+        if (dueNow) "Due!" else "$d Days, $h Hours",
+        color = if (dueNow) Color.Red else MaterialTheme.colorScheme.onSurface,
         style = MaterialTheme.typography.titleLarge,
         fontWeight = FontWeight.Bold
     )

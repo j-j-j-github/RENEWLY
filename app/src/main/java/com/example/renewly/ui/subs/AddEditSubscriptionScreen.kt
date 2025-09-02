@@ -1,8 +1,9 @@
 package com.example.renewly.ui.subs
-
+import com.example.renewly.data.CycleType
 import android.app.DatePickerDialog
 import android.content.Context
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -24,10 +25,9 @@ import io.github.jan.supabase.storage.storage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.UUID
-
-enum class CycleType { MONTHLY, YEARLY }
 
 fun uploadIconToSupabase(context: Context, uri: Uri, onComplete: (String?) -> Unit) {
     CoroutineScope(Dispatchers.IO).launch {
@@ -37,18 +37,23 @@ fun uploadIconToSupabase(context: Context, uri: Uri, onComplete: (String?) -> Un
             inputStream.close()
 
             val fileName = "${UUID.randomUUID()}.png"
-            val bucket = SupabaseClientProvider.client.storage.from("subscription-icons")
+            // --- THIS IS THE FIX ---
+            // The bucket name must exactly match the one in your Supabase dashboard.
+            val bucket = SupabaseClientProvider.client.storage.from("renewly_app_icons")
+            // ----------------------
 
-            // Upload file
             bucket.upload(fileName, bytes, upsert = true)
-
-            // Get public URL
             val url = bucket.publicUrl(fileName)
 
-            onComplete(url)
+            withContext(Dispatchers.Main) {
+                onComplete(url)
+            }
         } catch (e: Exception) {
             e.printStackTrace()
-            onComplete(null)
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, "Upload failed: ${e.message}", Toast.LENGTH_LONG).show()
+                onComplete(null)
+            }
         }
     }
 }
@@ -71,7 +76,6 @@ fun AddEditSubscriptionScreen(
     var iconUri by rememberSaveable { mutableStateOf<Uri?>(null) }
     var uploading by remember { mutableStateOf(false) }
 
-    // Load original values when editing
     LaunchedEffect(original) {
         if (original != null) {
             name = original.name
@@ -83,14 +87,12 @@ fun AddEditSubscriptionScreen(
         }
     }
 
-    // File picker
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         iconUri = uri
     }
 
-    // Date picker
     val calendar = Calendar.getInstance().apply { timeInMillis = purchaseDate }
     val datePicker = DatePickerDialog(
         context,
