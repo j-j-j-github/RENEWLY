@@ -1,5 +1,5 @@
 package com.example.renewly.ui.subs
-import com.example.renewly.data.CycleType
+
 import android.app.DatePickerDialog
 import android.content.Context
 import android.net.Uri
@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.example.renewly.data.CycleType
 import com.example.renewly.data.Subscription
 import com.example.renewly.data.SupabaseClientProvider
 import io.github.jan.supabase.storage.storage
@@ -37,10 +38,7 @@ fun uploadIconToSupabase(context: Context, uri: Uri, onComplete: (String?) -> Un
             inputStream.close()
 
             val fileName = "${UUID.randomUUID()}.png"
-            // --- THIS IS THE FIX ---
-            // The bucket name must exactly match the one in your Supabase dashboard.
             val bucket = SupabaseClientProvider.client.storage.from("renewly_app_icons")
-            // ----------------------
 
             bucket.upload(fileName, bytes, upsert = true)
             val url = bucket.publicUrl(fileName)
@@ -70,7 +68,8 @@ fun AddEditSubscriptionScreen(
 
     var name by rememberSaveable { mutableStateOf("") }
     var price by rememberSaveable { mutableStateOf("") }
-    var purchaseDate by rememberSaveable { mutableStateOf(Calendar.getInstance().timeInMillis) }
+    // BUG FIX: Renamed `purchaseDate` to `startDate` for clarity. This is the permanent start of the sub.
+    var startDate by rememberSaveable { mutableStateOf(Calendar.getInstance().timeInMillis) }
     var cycleType by rememberSaveable { mutableStateOf(CycleType.MONTHLY) }
     var iconKey by rememberSaveable { mutableStateOf("🎯") }
     var iconUri by rememberSaveable { mutableStateOf<Uri?>(null) }
@@ -80,7 +79,9 @@ fun AddEditSubscriptionScreen(
         if (original != null) {
             name = original.name
             price = original.price.toString()
-            purchaseDate = original.nextDueDate
+            // BUG FIX: Use the sub's actual start date, not the next due date.
+            // You must add `startDate` to your `Subscription` data class.
+            startDate = original.startDate
             cycleType = if (original.cycleInDays >= 365) CycleType.YEARLY else CycleType.MONTHLY
             iconKey = original.iconKey
             iconUri = original.iconUri?.let { Uri.parse(it) }
@@ -93,12 +94,12 @@ fun AddEditSubscriptionScreen(
         iconUri = uri
     }
 
-    val calendar = Calendar.getInstance().apply { timeInMillis = purchaseDate }
+    val calendar = Calendar.getInstance().apply { timeInMillis = startDate }
     val datePicker = DatePickerDialog(
         context,
         { _, year, month, day ->
             calendar.set(year, month, day, 0, 0, 0)
-            purchaseDate = calendar.timeInMillis
+            startDate = calendar.timeInMillis
         },
         calendar.get(Calendar.YEAR),
         calendar.get(Calendar.MONTH),
@@ -125,6 +126,7 @@ fun AddEditSubscriptionScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // ... (All TextFields and other UI elements remain the same) ...
             OutlinedTextField(
                 value = name,
                 onValueChange = { input -> name = input },
@@ -159,10 +161,10 @@ fun AddEditSubscriptionScreen(
             }
 
             Button(onClick = { datePicker.show() }) {
-                val selectedDate = Calendar.getInstance().apply { timeInMillis = purchaseDate }
+                val selectedDate = Calendar.getInstance().apply { timeInMillis = startDate }
                 Text("Start Date: ${selectedDate.get(Calendar.DAY_OF_MONTH)}/${selectedDate.get(Calendar.MONTH) + 1}/${selectedDate.get(Calendar.YEAR)}")
             }
-
+            // ... (rest of the UI is the same) ...
             OutlinedTextField(
                 value = iconKey,
                 onValueChange = { input -> iconKey = input.take(2) },
@@ -180,18 +182,25 @@ fun AddEditSubscriptionScreen(
                 }
             }
 
+
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(
                     enabled = !uploading,
                     onClick = {
                         uploading = true
 
-                        val calcCalendar = Calendar.getInstance().apply { timeInMillis = purchaseDate }
-                        if (cycleType == CycleType.MONTHLY) {
-                            calcCalendar.add(Calendar.MONTH, 1)
-                        } else {
-                            calcCalendar.add(Calendar.YEAR, 1)
+                        // BUG FIX: Always calculate next due date from the stable `startDate`.
+                        val calcCalendar = Calendar.getInstance().apply { timeInMillis = startDate }
+
+                        // Keep adding months/years until the date is in the future
+                        while(calcCalendar.timeInMillis < Calendar.getInstance().timeInMillis) {
+                            if (cycleType == CycleType.MONTHLY) {
+                                calcCalendar.add(Calendar.MONTH, 1)
+                            } else {
+                                calcCalendar.add(Calendar.YEAR, 1)
+                            }
                         }
+                        val nextDue = calcCalendar.timeInMillis
 
                         if (iconUri != null && iconUri.toString().startsWith("content://")) {
                             uploadIconToSupabase(context, iconUri!!) { uploadedUrl: String? ->
@@ -200,7 +209,8 @@ fun AddEditSubscriptionScreen(
                                     name = name.trim(),
                                     price = price.toDoubleOrNull() ?: 0.0,
                                     cycleInDays = if (cycleType == CycleType.YEARLY) 365 else 30,
-                                    nextDueDate = calcCalendar.timeInMillis,
+                                    startDate = startDate, // <-- Save the start date
+                                    nextDueDate = nextDue,
                                     iconKey = if (uploadedUrl == null) iconKey.ifBlank { "📦" } else "",
                                     iconUri = uploadedUrl
                                 )
@@ -213,9 +223,11 @@ fun AddEditSubscriptionScreen(
                                 name = name.trim(),
                                 price = price.toDoubleOrNull() ?: 0.0,
                                 cycleInDays = if (cycleType == CycleType.YEARLY) 365 else 30,
-                                nextDueDate = calcCalendar.timeInMillis,
-                                iconKey = original?.iconKey ?: iconKey.ifBlank { "📦" },
-                                iconUri = original?.iconUri
+                                startDate = startDate, // <-- Save the start date
+                                nextDueDate = nextDue,
+                                iconKey = iconKey.ifBlank { "📦" },
+                                // Preserve existing URI if not changed
+                                iconUri = if (iconUri?.toString()?.startsWith("http") == true) iconUri.toString() else original?.iconUri
                             )
                             uploading = false
                             onSave(sub)

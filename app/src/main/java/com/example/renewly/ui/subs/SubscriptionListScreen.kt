@@ -1,5 +1,5 @@
 package com.example.renewly.ui.subs
-import com.example.renewly.data.CycleType
+
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.example.renewly.data.CycleType
 import com.example.renewly.data.Subscription
 import kotlinx.coroutines.delay
 import java.util.Calendar
@@ -78,6 +79,7 @@ fun SubscriptionListScreen(
             }
         }
 
+        // Side menu
         if (showMenu) {
             Box(
                 modifier = Modifier
@@ -130,8 +132,8 @@ private fun SubscriptionCard(sub: Subscription, onClick: () -> Unit, onDelete: (
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                val isUrl = sub.iconUri?.startsWith("https://") == true
-                if (isUrl) {
+                // ✅ If iconUri is a real Supabase URL, show image. Else fallback to emoji/char.
+                if (!sub.iconUri.isNullOrEmpty() && sub.iconUri!!.startsWith("http")) {
                     AsyncImage(
                         model = sub.iconUri,
                         contentDescription = sub.name,
@@ -175,7 +177,6 @@ private fun SubscriptionCard(sub: Subscription, onClick: () -> Unit, onDelete: (
 
 @Composable
 private fun CountdownText(startMillis: Long, cycleType: CycleType) {
-    // Tick every second so the countdown updates
     val now by produceState(System.currentTimeMillis()) {
         while (true) {
             value = System.currentTimeMillis()
@@ -183,12 +184,11 @@ private fun CountdownText(startMillis: Long, cycleType: CycleType) {
         }
     }
 
-    // Calculate the *next* due date by rolling the start date forward in calendar units
     val nextDue = remember(startMillis, cycleType, now) {
         val cal = Calendar.getInstance().apply { timeInMillis = startMillis }
         val current = Calendar.getInstance().apply { timeInMillis = now }
 
-        // Keep adding months/years until due date is after "now"
+        // Roll until future
         while (!cal.after(current)) {
             when (cycleType) {
                 CycleType.MONTHLY -> cal.add(Calendar.MONTH, 1)
