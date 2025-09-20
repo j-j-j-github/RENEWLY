@@ -9,5 +9,6 @@ data class Subscription(
     val nextDueDate: Long = System.currentTimeMillis(),
     val notes: String? = null, // Your new field
     val iconKey: String = "🧩",
-    val iconUri: String? = null
+    val iconUri: String? = null,
+    val colorHex: String? = null
 )

@@ -1,5 +1,6 @@
 package com.example.renewly.ui.subs
 
+import android.widget.Toast
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -11,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Brightness6
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,11 +21,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.renewly.data.CycleType
 import com.example.renewly.data.Subscription
+import com.example.renewly.ui.auth.EditNameDialog
+import com.example.renewly.ui.auth.ProfileViewModel
+import com.example.renewly.ui.theme.AppGradients
 import kotlinx.coroutines.delay
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
@@ -37,9 +45,25 @@ fun SubscriptionListScreen(
     onAdd: () -> Unit,
     onEdit: (Subscription) -> Unit,
     onDelete: (Subscription) -> Unit,
-    onLogout: () -> Unit = {}
+    onLogout: () -> Unit,
+    onNavigateToAuth: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
+    var showEditNameDialog by remember { mutableStateOf(false) }
+
+    val profileViewModel: ProfileViewModel = viewModel()
+    val uiState by profileViewModel.uiState.collectAsState()
+    val context = LocalContext.current
+
+    if (showEditNameDialog) {
+        EditNameDialog(
+            currentName = uiState.name,
+            onDismiss = { showEditNameDialog = false },
+            onSave = { newName ->
+                profileViewModel.updateUserName(newName, context)
+            }
+        )
+    }
 
     Box(Modifier.fillMaxSize()) {
         Scaffold(
@@ -79,7 +103,6 @@ fun SubscriptionListScreen(
             }
         }
 
-        // Side menu
         if (showMenu) {
             Box(
                 modifier = Modifier
@@ -87,7 +110,6 @@ fun SubscriptionListScreen(
                     .background(Color.Black.copy(alpha = 0.5f))
                     .clickable { showMenu = false }
             )
-
             Surface(
                 tonalElevation = 8.dp,
                 modifier = Modifier
@@ -97,14 +119,52 @@ fun SubscriptionListScreen(
             ) {
                 Column(
                     modifier = Modifier
-                        .fillMaxHeight()
+                        .fillMaxSize()
                         .padding(16.dp),
-                    verticalArrangement = Arrangement.Top
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("Menu", style = MaterialTheme.typography.titleMedium)
+                    Text("Menu", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(8.dp))
-                    Button(onClick = { onLogout(); showMenu = false }) {
-                        Text("Logout")
+                    Divider()
+                    Spacer(Modifier.height(16.dp))
+
+                    if (uiState.isLoggedIn) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = uiState.name,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            IconButton(onClick = { showEditNameDialog = true }) {
+                                Icon(Icons.Default.Edit, contentDescription = "Edit Name", modifier = Modifier.size(18.dp))
+                            }
+                        }
+                        Text(
+                            text = uiState.email,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        TextButton(onClick = {
+                            profileViewModel.sendPasswordReset(context)
+                        }) {
+                            Text("Reset Password")
+                        }
+                        Spacer(Modifier.weight(1f))
+                        Button(
+                            onClick = { onLogout(); showMenu = false },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Logout")
+                        }
+                    } else {
+                        Text("You are not logged in.")
+                        Spacer(Modifier.height(16.dp))
+                        Button(
+                            onClick = { onNavigateToAuth(); showMenu = false },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Login / Sign Up")
+                        }
                     }
                 }
             }
@@ -112,27 +172,31 @@ fun SubscriptionListScreen(
     }
 }
 
+
 @Composable
 private fun SubscriptionCard(sub: Subscription, onClick: () -> Unit, onDelete: () -> Unit) {
+    // --- THIS IS THE CHANGE ---
+    // 1. Get the selected gradient brush, with a default fallback
+    val cardBrush = AppGradients.getBrushByHex(sub.colorHex)
+
     ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
             .animateContentSize()
             .clickable { onClick() },
         shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)
-        )
+        // 2. We remove the static containerColor to let the gradient shine through
     ) {
+        // 3. Apply the gradient to the background of the Row
         Row(
             Modifier
+                .background(cardBrush)
                 .padding(16.dp)
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // ✅ If iconUri is a real Supabase URL, show image. Else fallback to emoji/char.
                 if (!sub.iconUri.isNullOrEmpty() && sub.iconUri!!.startsWith("http")) {
                     AsyncImage(
                         model = sub.iconUri,
@@ -188,7 +252,6 @@ private fun CountdownText(startMillis: Long, cycleType: CycleType) {
         val cal = Calendar.getInstance().apply { timeInMillis = startMillis }
         val current = Calendar.getInstance().apply { timeInMillis = now }
 
-        // Roll until future
         while (!cal.after(current)) {
             when (cycleType) {
                 CycleType.MONTHLY -> cal.add(Calendar.MONTH, 1)

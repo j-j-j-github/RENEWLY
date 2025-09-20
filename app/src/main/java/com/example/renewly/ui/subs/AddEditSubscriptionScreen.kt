@@ -7,7 +7,13 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
@@ -15,6 +21,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -22,6 +30,8 @@ import coil.compose.AsyncImage
 import com.example.renewly.data.CycleType
 import com.example.renewly.data.Subscription
 import com.example.renewly.data.SupabaseClientProvider
+import com.example.renewly.ui.theme.AppGradients
+import com.example.renewly.ui.theme.GradientInfo
 import io.github.jan.supabase.storage.storage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,19 +40,18 @@ import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.UUID
 
+// This function can remain in the file or be moved to its own file.
 fun uploadIconToSupabase(context: Context, uri: Uri, onComplete: (String?) -> Unit) {
+    // ... (This function is unchanged)
     CoroutineScope(Dispatchers.IO).launch {
         try {
             val inputStream = context.contentResolver.openInputStream(uri)!!
             val bytes = inputStream.readBytes()
             inputStream.close()
-
             val fileName = "${UUID.randomUUID()}.png"
             val bucket = SupabaseClientProvider.client.storage.from("renewly_app_icons")
-
             bucket.upload(fileName, bytes, upsert = true)
             val url = bucket.publicUrl(fileName)
-
             withContext(Dispatchers.Main) {
                 onComplete(url)
             }
@@ -56,6 +65,7 @@ fun uploadIconToSupabase(context: Context, uri: Uri, onComplete: (String?) -> Un
     }
 }
 
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEditSubscriptionScreen(
@@ -68,23 +78,22 @@ fun AddEditSubscriptionScreen(
 
     var name by rememberSaveable { mutableStateOf("") }
     var price by rememberSaveable { mutableStateOf("") }
-    // BUG FIX: Renamed `purchaseDate` to `startDate` for clarity. This is the permanent start of the sub.
     var startDate by rememberSaveable { mutableStateOf(Calendar.getInstance().timeInMillis) }
     var cycleType by rememberSaveable { mutableStateOf(CycleType.MONTHLY) }
     var iconKey by rememberSaveable { mutableStateOf("🎯") }
     var iconUri by rememberSaveable { mutableStateOf<Uri?>(null) }
+    var colorHex by rememberSaveable { mutableStateOf<String?>(null) } // <-- 1. Added State for color
     var uploading by remember { mutableStateOf(false) }
 
     LaunchedEffect(original) {
         if (original != null) {
             name = original.name
             price = original.price.toString()
-            // BUG FIX: Use the sub's actual start date, not the next due date.
-            // You must add `startDate` to your `Subscription` data class.
             startDate = original.startDate
             cycleType = if (original.cycleInDays >= 365) CycleType.YEARLY else CycleType.MONTHLY
             iconKey = original.iconKey
             iconUri = original.iconUri?.let { Uri.parse(it) }
+            colorHex = original.colorHex // <-- 2. Load existing color
         }
     }
 
@@ -126,7 +135,6 @@ fun AddEditSubscriptionScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // ... (All TextFields and other UI elements remain the same) ...
             OutlinedTextField(
                 value = name,
                 onValueChange = { input -> name = input },
@@ -164,7 +172,6 @@ fun AddEditSubscriptionScreen(
                 val selectedDate = Calendar.getInstance().apply { timeInMillis = startDate }
                 Text("Start Date: ${selectedDate.get(Calendar.DAY_OF_MONTH)}/${selectedDate.get(Calendar.MONTH) + 1}/${selectedDate.get(Calendar.YEAR)}")
             }
-            // ... (rest of the UI is the same) ...
             OutlinedTextField(
                 value = iconKey,
                 onValueChange = { input -> iconKey = input.take(2) },
@@ -182,18 +189,21 @@ fun AddEditSubscriptionScreen(
                 }
             }
 
+            // <-- 3. Display the color picker UI
+            Text("Theme Color", style = MaterialTheme.typography.bodyLarge)
+            GradientColorPicker(
+                predefinedGradients = AppGradients.predefinedGradients,
+                selectedColorHex = colorHex,
+                onColorSelected = { selectedHex -> colorHex = selectedHex }
+            )
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(
                     enabled = !uploading,
                     onClick = {
                         uploading = true
-
-                        // BUG FIX: Always calculate next due date from the stable `startDate`.
                         val calcCalendar = Calendar.getInstance().apply { timeInMillis = startDate }
-
-                        // Keep adding months/years until the date is in the future
-                        while(calcCalendar.timeInMillis < Calendar.getInstance().timeInMillis) {
+                        while (calcCalendar.timeInMillis < Calendar.getInstance().timeInMillis) {
                             if (cycleType == CycleType.MONTHLY) {
                                 calcCalendar.add(Calendar.MONTH, 1)
                             } else {
@@ -209,10 +219,11 @@ fun AddEditSubscriptionScreen(
                                     name = name.trim(),
                                     price = price.toDoubleOrNull() ?: 0.0,
                                     cycleInDays = if (cycleType == CycleType.YEARLY) 365 else 30,
-                                    startDate = startDate, // <-- Save the start date
+                                    startDate = startDate,
                                     nextDueDate = nextDue,
                                     iconKey = if (uploadedUrl == null) iconKey.ifBlank { "📦" } else "",
-                                    iconUri = uploadedUrl
+                                    iconUri = uploadedUrl,
+                                    colorHex = colorHex // <-- 4. Save the selected color
                                 )
                                 uploading = false
                                 onSave(sub)
@@ -223,11 +234,11 @@ fun AddEditSubscriptionScreen(
                                 name = name.trim(),
                                 price = price.toDoubleOrNull() ?: 0.0,
                                 cycleInDays = if (cycleType == CycleType.YEARLY) 365 else 30,
-                                startDate = startDate, // <-- Save the start date
+                                startDate = startDate,
                                 nextDueDate = nextDue,
                                 iconKey = iconKey.ifBlank { "📦" },
-                                // Preserve existing URI if not changed
-                                iconUri = if (iconUri?.toString()?.startsWith("http") == true) iconUri.toString() else original?.iconUri
+                                iconUri = if (iconUri?.toString()?.startsWith("http") == true) iconUri.toString() else original?.iconUri,
+                                colorHex = colorHex // <-- 4. Save the selected color
                             )
                             uploading = false
                             onSave(sub)
@@ -236,9 +247,37 @@ fun AddEditSubscriptionScreen(
                 ) {
                     Text(if (uploading) "Uploading..." else "Save")
                 }
-
                 OutlinedButton(onClick = onCancel) { Text("Cancel") }
             }
+        }
+    }
+}
+
+// This helper Composable is now used by the screen above.
+@Composable
+private fun GradientColorPicker(
+    predefinedGradients: List<GradientInfo>,
+    selectedColorHex: String?,
+    onColorSelected: (String) -> Unit
+) {
+    LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(predefinedGradients) { gradient ->
+            val isSelected = gradient.hex == selectedColorHex
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(gradient.brush)
+                    .border(
+                        width = 2.dp,
+                        color = if (isSelected) MaterialTheme.colorScheme.onSurface else Color.Transparent,
+                        shape = CircleShape
+                    )
+                    .clickable { onColorSelected(gradient.hex) }
+            )
         }
     }
 }

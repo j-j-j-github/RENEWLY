@@ -62,6 +62,11 @@ class MainActivity : ComponentActivity() {
                                 nav.navigate("auth") {
                                     popUpTo("list") { inclusive = true }
                                 }
+                            },
+                            onNavigateToAuth = {
+                                nav.navigate("auth") {
+                                    popUpTo("list") { inclusive = true }
+                                }
                             }
                         )
                     }
