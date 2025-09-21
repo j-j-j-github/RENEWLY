@@ -1,6 +1,8 @@
 package com.example.renewly.ui.subs
 
-import android.widget.Toast
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -10,10 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Brightness6
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,6 +32,7 @@ import com.example.renewly.ui.auth.EditNameDialog
 import com.example.renewly.ui.auth.ProfileViewModel
 import com.example.renewly.ui.theme.AppGradients
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
@@ -46,7 +46,7 @@ fun SubscriptionListScreen(
     onEdit: (Subscription) -> Unit,
     onDelete: (Subscription) -> Unit,
     onLogout: () -> Unit,
-    onNavigateToAuth: () -> Unit
+    onNavigateToAuth: () -> Unit = {}
 ) {
     var showMenu by remember { mutableStateOf(false) }
     var showEditNameDialog by remember { mutableStateOf(false) }
@@ -54,6 +54,19 @@ fun SubscriptionListScreen(
     val profileViewModel: ProfileViewModel = viewModel()
     val uiState by profileViewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    // Launcher for picking an image from the device
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            scope.launch {
+                // Trigger the profile picture upload in the ViewModel
+                profileViewModel.uploadProfilePicture(context, uri)
+            }
+        }
+    }
 
     if (showEditNameDialog) {
         EditNameDialog(
@@ -111,6 +124,7 @@ fun SubscriptionListScreen(
                     .clickable { showMenu = false }
             )
             Surface(
+                color = Color.Black,
                 tonalElevation = 8.dp,
                 modifier = Modifier
                     .fillMaxHeight()
@@ -123,41 +137,82 @@ fun SubscriptionListScreen(
                         .padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("Menu", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(8.dp))
-                    Divider()
+                    // Profile picture and details
+                    Spacer(Modifier.height(16.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .size(100.dp)
+                            .clip(CircleShape)
+                            .background(Color.DarkGray)
+                            .clickable { launcher.launch("image/*") }, // Clickable to change photo
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (uiState.photoUrl.isNullOrEmpty()) {
+                            Text(
+                                text = uiState.name.take(1).uppercase(),
+                                style = MaterialTheme.typography.headlineLarge,
+                                color = Color.White
+                            )
+                        } else {
+                            AsyncImage(
+                                model = uiState.photoUrl,
+                                contentDescription = "Profile Picture",
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        // Optional: Add an overlay icon for editing
+                        Box(
+                            modifier = Modifier
+                                .size(30.dp)
+                                .clip(CircleShape)
+                                .background(Color.Gray.copy(alpha = 0.7f))
+                                .align(Alignment.BottomEnd)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CameraAlt,
+                                contentDescription = "Change Profile Picture",
+                                tint = Color.White,
+                                modifier = Modifier.padding(4.dp)
+                            )
+                        }
+                    }
+
                     Spacer(Modifier.height(16.dp))
 
                     if (uiState.isLoggedIn) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = uiState.name,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            IconButton(onClick = { showEditNameDialog = true }) {
-                                Icon(Icons.Default.Edit, contentDescription = "Edit Name", modifier = Modifier.size(18.dp))
-                            }
-                        }
+                        Text(
+                            text = uiState.name,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
                         Text(
                             text = uiState.email,
-                            style = MaterialTheme.typography.bodySmall
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.LightGray
                         )
                         Spacer(Modifier.height(8.dp))
-                        TextButton(onClick = {
-                            profileViewModel.sendPasswordReset(context)
-                        }) {
-                            Text("Reset Password")
+                        TextButton(
+                            onClick = {
+                                profileViewModel.sendPasswordReset(context)
+                            }
+                        ) {
+                            Text("Reset Password", color = Color.LightGray)
                         }
                         Spacer(Modifier.weight(1f))
                         Button(
                             onClick = { onLogout(); showMenu = false },
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
                         ) {
                             Text("Logout")
                         }
                     } else {
-                        Text("You are not logged in.")
+                        Text(
+                            "You are not logged in.",
+                            color = Color.White
+                        )
                         Spacer(Modifier.height(16.dp))
                         Button(
                             onClick = { onNavigateToAuth(); showMenu = false },
@@ -175,8 +230,8 @@ fun SubscriptionListScreen(
 
 @Composable
 private fun SubscriptionCard(sub: Subscription, onClick: () -> Unit, onDelete: () -> Unit) {
-    // --- THIS IS THE CHANGE ---
-    // 1. Get the selected gradient brush, with a default fallback
+// --- THIS IS THE CHANGE ---
+// 1. Get the selected gradient brush, with a default fallback
     val cardBrush = AppGradients.getBrushByHex(sub.colorHex)
 
     ElevatedCard(
@@ -185,9 +240,9 @@ private fun SubscriptionCard(sub: Subscription, onClick: () -> Unit, onDelete: (
             .animateContentSize()
             .clickable { onClick() },
         shape = RoundedCornerShape(28.dp),
-        // 2. We remove the static containerColor to let the gradient shine through
+// 2. We remove the static containerColor to let the gradient shine through
     ) {
-        // 3. Apply the gradient to the background of the Row
+// 3. Apply the gradient to the background of the Row
         Row(
             Modifier
                 .background(cardBrush)

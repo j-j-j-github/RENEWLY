@@ -72,6 +72,8 @@ dependencies {
     implementation("io.github.jan-tennert.supabase:storage-kt")
     implementation("io.github.jan-tennert.supabase:realtime-kt") // For real-time updates
 
+    implementation("io.github.jan-tennert.supabase:postgrest-kt:1.4.1")
+
     // Ktor dependency is now managed by the Supabase BOM, so we remove it from here
     implementation("io.ktor:ktor-client-android:2.3.11")
 

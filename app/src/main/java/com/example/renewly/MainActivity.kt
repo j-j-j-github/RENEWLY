@@ -1,5 +1,4 @@
 package com.example.renewly
-
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -31,23 +30,31 @@ class MainActivity : ComponentActivity() {
             var dark by remember { mutableStateOf(false) }
             val scope = rememberCoroutineScope()
 
+            // Observe saved theme
             LaunchedEffect(Unit) {
                 themeRepo.darkFlow.collectLatest { dark = it }
             }
 
             RenewlyTheme(darkTheme = dark) {
                 val nav = rememberNavController()
-
                 val authed = auth.currentUser != null
-                NavHost(navController = nav, startDestination = if (authed) "list" else "auth") {
+
+                NavHost(
+                    navController = nav,
+                    startDestination = if (authed) "list" else "auth"
+                ) {
+                    // --- Auth screen ---
                     composable("auth") {
-                        AuthScreen(onAuthed = {
-                            nav.navigate("list") {
-                                popUpTo("auth") { inclusive = true }
+                        AuthScreen(
+                            onAuthed = {
+                                nav.navigate("list") {
+                                    popUpTo("auth") { inclusive = true }
+                                }
                             }
-                        })
+                        )
                     }
 
+                    // --- Subscription list ---
                     composable("list") {
                         val vm: SubscriptionsViewModel = viewModel()
                         SubscriptionListScreen(
@@ -63,14 +70,10 @@ class MainActivity : ComponentActivity() {
                                     popUpTo("list") { inclusive = true }
                                 }
                             },
-                            onNavigateToAuth = {
-                                nav.navigate("auth") {
-                                    popUpTo("list") { inclusive = true }
-                                }
-                            }
                         )
                     }
 
+                    // --- Add new subscription ---
                     composable("edit") {
                         val vm: SubscriptionsViewModel = viewModel()
                         AddEditSubscriptionScreen(
@@ -84,6 +87,7 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
+                    // --- Edit existing subscription ---
                     composable(
                         route = "edit?id={id}",
                         arguments = listOf(navArgument("id") {
