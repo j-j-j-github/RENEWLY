@@ -158,24 +158,11 @@ fun SubscriptionListScreen(
                             AsyncImage(
                                 model = uiState.photoUrl,
                                 contentDescription = "Profile Picture",
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier.fillMaxSize(), // This makes the image fill the circle
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop // This crops it to fit, removing empty space
                             )
                         }
-                        // Optional: Add an overlay icon for editing
-                        Box(
-                            modifier = Modifier
-                                .size(30.dp)
-                                .clip(CircleShape)
-                                .background(Color.Gray.copy(alpha = 0.7f))
-                                .align(Alignment.BottomEnd)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CameraAlt,
-                                contentDescription = "Change Profile Picture",
-                                tint = Color.White,
-                                modifier = Modifier.padding(4.dp)
-                            )
-                        }
+                        // Removed the camera icon Box composable entirely
                     }
 
                     Spacer(Modifier.height(16.dp))
@@ -194,9 +181,7 @@ fun SubscriptionListScreen(
                         )
                         Spacer(Modifier.height(8.dp))
                         TextButton(
-                            onClick = {
-                                profileViewModel.sendPasswordReset(context)
-                            }
+                            onClick = { profileViewModel.sendPasswordReset(context) }
                         ) {
                             Text("Reset Password", color = Color.LightGray)
                         }
