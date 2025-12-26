@@ -1,96 +1,76 @@
-Renewly – Smart Subscription Manager 💳📱
+# 📱 Renewly
 
-⸻
+[![Platform](https://img.shields.io/badge/Platform-Android-brightgreen.svg)](https://developer.android.com/android)
+[![Kotlin](https://img.shields.io/badge/Language-Kotlin-blue.svg)](https://kotlinlang.org/)
+[![Compose](https://img.shields.io/badge/UI-Jetpack_Compose-orange.svg)](https://developer.android.com/jetpack/compose)
+[![Firebase](https://img.shields.io/badge/Backend-Firebase-ffca28.svg)](https://firebase.google.com/)
 
-Renewly is a premium Android application designed to help users track, manage, and never miss subscription renewals. Built with Jetpack Compose and Material 3, it blends modern Android design with fluid, Apple‑inspired aesthetics for a polished, high‑end experience.
+**Renewly** is a high-performance subscription tracking application for Android. It is designed to give users total control over their recurring expenses through a premium, gesture-driven interface inspired by modern Apple-like aesthetics and Material 3 design principles.
 
-⸻
+---
 
-📱 Features
+## ✨ Features
 
-⸻
+### 💎 Premium Experience
+* **Backdrop Blur Effect:** Utilizes `RenderEffect` (API 31+) to create a "glassmorphism" blur on the main dashboard whenever the sidebar is active.
+* **Fluid Animations:** Right-to-left sliding sidebar with custom spring physics and synchronized background fading.
+* **Dynamic Theming:** Supports full Light and Dark mode transitions with gradient-mapped subscription cards that adapt to brand colors.
 
-	•	Smart Countdown
-Real‑time tracking that displays days and hours remaining until the next billing cycle.
-	•	Automated Renewals
-Built‑in logic for monthly and yearly subscriptions with automatic date calculations.
-	•	Dynamic Subscription Cards
-Cards generate rich gradient backgrounds dynamically based on the brand’s primary color.
-	•	Fluid Side Navigation
-Custom right‑side drawer with a smooth 350ms ease‑in‑out animation.
-	•	Backdrop Blur (Android 12+)
-Real‑time Gaussian blur and dimming applied to background content when the sidebar is open.
-	•	Graceful Fallback
-Devices below Android 12 display a clean semi‑transparent overlay instead of blur.
-	•	Brand Icon Support
-Upload custom subscription icons via Firebase, with local fallback icons generated from brand initials.
-	•	Custom Currency Selector
-Scrollable dropdown with a persistent scrollbar supporting 15+ global currencies (USD, EUR, INR, GBP, JPY, and more).
-	•	Profile Management
-Upload and update profile pictures directly from the gallery with instant UI updates.
-	•	Password Recovery
-Reset passwords seamlessly from within the sidebar.
-	•	Collapsible About Section
-Interactive section showing app version, creator details, and a “Report a Problem” mailto link.
+### 📊 Subscription Management
+* **Precision Tracking:** View remaining time in a "Days & Hours" countdown format for every service.
+* **Auto-Calculated Cycles:** Handles monthly and yearly billing cycles automatically, refreshing the due date once a cycle passes.
+* **Visual Branding:** Custom icon support via Firebase Storage with initials-based fallback icons for a clean look.
 
-⸻
+### 👤 Profile & Customization
+* **Secure Auth:** Full login, signup, and password reset flow powered by Firebase Authentication.
+* **Cloud Sync:** Profile data and subscription lists are synced across devices via Firestore.
+* **Global Currencies:** A custom-built, scrollable selector supporting major world currencies with a green-gradient UI and custom scrollbar.
 
-🛠️ Tech Stack
+---
 
-⸻
+## 🛠 Tech Stack
 
-	•	Language: Kotlin
-	•	UI: Jetpack Compose (Material 3)
-	•	Architecture: MVVM (Model‑View‑ViewModel) with StateFlow
-	•	Backend: Firebase Authentication, Firestore, Cloud Storage
-	•	Image Loading: Coil (AsyncImage, circular clipping support)
+| Layer | Technology |
+| :--- | :--- |
+| **UI Framework** | [Jetpack Compose](https://developer.android.com/jetpack/compose) (Material 3) |
+| **Backend** | Firebase (Auth, Firestore, Storage) |
+| **Image Loading** | [Coil](https://coil-kt.github.io/coil/) |
+| **Asynchronous** | Kotlin Coroutines & StateFlow |
+| **Architecture** | MVVM (Model-View-ViewModel) |
 
-⸻
+---
 
-📂 Project Overview
+## ⚙️ Setup Instructions
 
-⸻
+### Prerequisites
+- Android Studio Ladybug (or newer).
+- A Firebase Project set up in the Google Console.
 
-	•	Compose‑First UI — Fully declarative UI built with Jetpack Compose
-	•	State‑Driven Design — Reactive UI powered by StateFlow
-	•	Firebase Integration — Secure authentication, real‑time data, and image storage
-	•	Modern Animations — Smooth transitions, gradients, and blur effects using modern Android rendering APIs
+### Configuration
+1.  **Firebase:**
+    * Download your `google-services.json` and place it in the `app/` folder.
+    * Enable **Email/Password** in the Firebase Auth tab.
+2.  **Assets:**
+    * Ensure your app branding is in `res/drawable/renewly.png` to support the framed "About" section.
+3.  **Build:**
+    ```bash
+    ./gradlew assembleDebug
+    ```
 
-⸻
+---
 
-🛠️ Setup & Installation
+## 📂 Project Structure
 
-⸻
+```text
+com.example.renewly
+├── data          # Subscription data models & CycleType enums
+├── ui
+│   ├── auth      # Auth screens, EditNameDialog, & ProfileViewModel
+│   ├── subs      # SubscriptionListScreen & Sidebar UI components
+│   └── theme     # Design system, Colors, & AppGradients
+└── MainActivity  # Entry point and Navigation host
+```
 
-Clone the Repository
-
-git clone https://github.com/yourusername/renewly.git
-
-
-⸻
-
-Firebase Configuration
-	•	Place google-services.json inside the /app directory
-	•	Enable the following services in Firebase Console:
-	•	Authentication (Email / Password)
-	•	Cloud Firestore
-	•	Cloud Storage
-
-⸻
-
-Requirements
-	•	Latest Android Studio with Jetpack Compose support
-	•	Android 12 (API 31+) for blur effects (optional but recommended)
-
-⸻
-
-👤 Author
-
-⸻
-
-Jeeval Jolly Jacob
-Creator & Lead Developer
-
-⸻
-
-Renewly brings clarity and elegance to subscription management, helping users stay in control with a smooth, modern Android experience.
+## ✍️ Author
+Jeeval Jolly Jacob 
+Developer of Renewly
