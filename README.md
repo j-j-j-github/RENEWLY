@@ -72,5 +72,5 @@ com.example.renewly
 ```
 
 ## ✍️ Author
-Jeeval Jolly Jacob 
+**Jeeval Jolly Jacob**
 Developer of Renewly
